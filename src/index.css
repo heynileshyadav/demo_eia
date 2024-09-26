@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.ql-editor img {
+  max-width: 100%;
+  /* Scale images to fit the editor */
+  height: auto;
+}
