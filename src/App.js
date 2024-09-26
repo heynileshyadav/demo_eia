@@ -132,7 +132,7 @@ const App = () => {
     <div className="flex flex-col min-h-screen">
       {/* Header */}
       <header className="flex items-center justify-between p-4 bg-white shadow-md">
-        <h1 className="text-3xl font-bold text-gray-800">Demo</h1>
+        <h1 className="text-3xl font-bold text-gray-800">DEMO</h1>
         <div>
           {/* Button for PDF Download */}
           <button
