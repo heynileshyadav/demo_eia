@@ -30,7 +30,7 @@ const App = () => {
 
   const renderPDFPage = (content, position, resolve) => {
     html2canvas(content, { scale: 2 }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
+      // const imgData = canvas.toDataURL('image/png');
       const imgWidth = pageWidth - 20; // Padding for the image inside the PDF
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -105,37 +105,37 @@ const App = () => {
     setCurrentDocIndex(null);
   };
 
-  const insertTable = () => {
-    const rows = parseInt(prompt('Enter the number of rows:'), 10);
-    const cols = parseInt(prompt('Enter the number of columns:'), 10);
+  // const insertTable = () => {
+  //   const rows = parseInt(prompt('Enter the number of rows:'), 10);
+  //   const cols = parseInt(prompt('Enter the number of columns:'), 10);
     
-    if (rows > 0 && cols > 0) {
-      const quill = quillRef.current.getEditor();
-      const selection = quill.getSelection();
+  //   if (rows > 0 && cols > 0) {
+  //     const quill = quillRef.current.getEditor();
+  //     const selection = quill.getSelection();
 
-      const table = document.createElement('table');
-      table.style.width = '100%';
-      table.style.borderCollapse = 'collapse';
-      table.style.margin = '10px 0';
+  //     const table = document.createElement('table');
+  //     table.style.width = '100%';
+  //     table.style.borderCollapse = 'collapse';
+  //     table.style.margin = '10px 0';
       
-      for (let i = 0; i < rows; i++) {
-        const tr = document.createElement('tr');
-        for (let j = 0; j < cols; j++) {
-          const td = document.createElement('td');
-          td.style.border = '1px solid black';
-          td.style.padding = '8px';
-          td.innerText = `Row ${i + 1} Col ${j + 1}`;
-          tr.appendChild(td);
-        }
-        table.appendChild(tr);
-      }
+  //     for (let i = 0; i < rows; i++) {
+  //       const tr = document.createElement('tr');
+  //       for (let j = 0; j < cols; j++) {
+  //         const td = document.createElement('td');
+  //         td.style.border = '1px solid black';
+  //         td.style.padding = '8px';
+  //         td.innerText = `Row ${i + 1} Col ${j + 1}`;
+  //         tr.appendChild(td);
+  //       }
+  //       table.appendChild(tr);
+  //     }
 
-      if (selection) {
-        quill.clipboard.dangerouslyPasteHTML(selection.index, table.outerHTML);
-        quill.setSelection(selection.index + 1);
-      }
-    }
-  };
+  //     if (selection) {
+  //       quill.clipboard.dangerouslyPasteHTML(selection.index, table.outerHTML);
+  //       quill.setSelection(selection.index + 1);
+  //     }
+  //   }
+  // };
 
   const modules = {
     toolbar: isEditing
