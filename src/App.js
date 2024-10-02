@@ -9,63 +9,75 @@ const App = () => {
   const [isEditing, setIsEditing] = useState(true); // Edit mode state
   const [savedDocuments, setSavedDocuments] = useState([]); // List of saved documents
   const [currentDocIndex, setCurrentDocIndex] = useState(null); // Index of the current document being edited
+  const [currentPage, setCurrentPage] = useState(0); // Current pagination page
+  const docsPerPage = 5; // Number of documents to show per page
   const quillRef = useRef(null); // Reference to the Quill editor
 
   // Function to download PDF
   const handlePDFDownload = () => {
-    const editorContent = quillRef.current.getEditor().root;
+  const editorContent = quillRef.current.getEditor().root;
 
-    // Create a temporary div to render the content for PDF generation
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = editorContent.innerHTML;
-    document.body.appendChild(tempDiv);
+  // Create a temporary div for rendering the content
+  const tempDiv = document.createElement('div');
+  tempDiv.style.width = '210mm'; // A4 width
+  tempDiv.style.height = 'auto'; // Auto height for dynamic content
+  tempDiv.innerHTML = editorContent.innerHTML;
+  document.body.appendChild(tempDiv);
 
-    // Use html2canvas to take a screenshot of the content
-    html2canvas(tempDiv, { scale: 2 }).then((canvas) => {
+  const pdf = new jsPDF('p', 'mm', 'a4'); // A4 size
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  const renderPDFPage = (content, position, resolve) => {
+    html2canvas(content, { scale: 2 }).then((canvas) => {
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      
       const imgWidth = pageWidth - 20; // Padding for the image inside the PDF
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      let position = 10; // Starting point on the page
       let remainingHeight = imgHeight; // Remaining height of the image
+      let offsetY = 0; // Vertical offset for slicing the canvas
 
-      // Add the image to the PDF with pagination
       while (remainingHeight > 0) {
-        // Calculate how much can fit on the current page
-        const fitHeight = Math.min(remainingHeight, pageHeight - position - 10);
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, fitHeight);
-        remainingHeight -= fitHeight;
+        const fitHeight = Math.min(remainingHeight, pageHeight - position - 10); // Fit content to page height
+        const canvasSlice = document.createElement('canvas');
+        canvasSlice.width = canvas.width;
+        canvasSlice.height = (fitHeight / imgHeight) * canvas.height;
+        const context = canvasSlice.getContext('2d');
+        context.drawImage(canvas, 0, -offsetY, canvas.width, canvas.height);
 
-        // If there's still remaining height, add a new page
+        const imgSlice = canvasSlice.toDataURL('image/png');
+        pdf.addImage(imgSlice, 'PNG', 10, position, imgWidth, fitHeight);
+
+        remainingHeight -= fitHeight;
+        offsetY += fitHeight / imgHeight * canvas.height;
+
+        // If there's remaining height, add a new page
         if (remainingHeight > 0) {
           pdf.addPage();
           position = 10; // Reset position for the new page
         }
       }
-
-      // Cleanup the temporary div
-      document.body.removeChild(tempDiv);
-
-      // Save the PDF
-      pdf.save('document.pdf');
+      resolve();
     });
   };
 
-  // Save the content and replace old content if editing an existing document
+  renderPDFPage(tempDiv, 10, () => {
+    document.body.removeChild(tempDiv);
+    pdf.save('document.pdf');
+  });
+};
+
+
+
+
   const handleSave = () => {
     const editorContent = quillRef.current.getEditor().root.innerHTML;
 
     if (currentDocIndex !== null) {
-      // If editing an existing document, replace its content
       const updatedDocuments = [...savedDocuments];
       updatedDocuments[currentDocIndex].content = editorContent;
       setSavedDocuments(updatedDocuments);
     } else {
-      // Otherwise, save as a new document
       const newDocument = {
         id: Date.now(),
         content: editorContent,
@@ -76,27 +88,55 @@ const App = () => {
     alert('Content saved successfully!');
   };
 
-  // Toggle between Edit and View modes
   const handleEditToggle = () => {
     setIsEditing(!isEditing);
   };
 
-  // Load a saved document for editing
   const handleLoadDocument = (index) => {
     const document = savedDocuments[index];
-    setContent(document.content); // Load document content
-    setIsEditing(true); // Set to editing mode
-    setCurrentDocIndex(index); // Set the index of the current document being edited
+    setContent(document.content);
+    setIsEditing(true);
+    setCurrentDocIndex(index);
   };
 
-  // Create a new document
   const handleCreateNew = () => {
-    setContent(''); // Reset content
-    setIsEditing(true); // Enable editing
-    setCurrentDocIndex(null); // Reset current document index
+    setContent('');
+    setIsEditing(true);
+    setCurrentDocIndex(null);
   };
 
-  // Quill editor modules and formats
+  const insertTable = () => {
+    const rows = parseInt(prompt('Enter the number of rows:'), 10);
+    const cols = parseInt(prompt('Enter the number of columns:'), 10);
+    
+    if (rows > 0 && cols > 0) {
+      const quill = quillRef.current.getEditor();
+      const selection = quill.getSelection();
+
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.margin = '10px 0';
+      
+      for (let i = 0; i < rows; i++) {
+        const tr = document.createElement('tr');
+        for (let j = 0; j < cols; j++) {
+          const td = document.createElement('td');
+          td.style.border = '1px solid black';
+          td.style.padding = '8px';
+          td.innerText = `Row ${i + 1} Col ${j + 1}`;
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+
+      if (selection) {
+        quill.clipboard.dangerouslyPasteHTML(selection.index, table.outerHTML);
+        quill.setSelection(selection.index + 1);
+      }
+    }
+  };
+
   const modules = {
     toolbar: isEditing
       ? [
@@ -107,8 +147,9 @@ const App = () => {
           ['link', 'image', 'video'],
           [{ list: 'ordered' }, { list: 'bullet' }],
           ['clean'],
+          ['table'],
         ]
-      : false, // Disable toolbar when not editing
+      : false,
   };
 
   const formats = [
@@ -128,34 +169,47 @@ const App = () => {
     'video',
   ];
 
+  // Calculate the documents to display based on the current page
+  const indexOfLastDoc = (currentPage + 1) * docsPerPage;
+  const indexOfFirstDoc = indexOfLastDoc - docsPerPage;
+  const currentDocs = savedDocuments.slice(indexOfFirstDoc, indexOfLastDoc);
+
+  // Pagination buttons
+  const handleNextPage = () => {
+    if (indexOfLastDoc < savedDocuments.length) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Header */}
       <header className="flex items-center justify-between p-4 bg-white shadow-md">
         <h1 className="text-3xl font-bold text-gray-800">DEMO</h1>
         <div>
-          {/* Button for PDF Download */}
           <button
             onClick={handlePDFDownload}
             className="bg-green-500 text-white px-4 py-2 mr-2 rounded-md hover:bg-green-600 transition"
           >
             Download as PDF
           </button>
-          {/* Save Button */}
           <button
             onClick={handleSave}
             className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
           >
             Save
           </button>
-          {/* Create New Document Button */}
           <button
             onClick={handleCreateNew}
             className="bg-teal-500 text-white px-4 py-2 ml-2 rounded-md hover:bg-teal-600 transition"
           >
             Create New
           </button>
-          {/* Edit Button to toggle editing */}
           <button
             onClick={handleEditToggle}
             className={`bg-yellow-500 text-white px-4 py-2 ml-2 rounded-md hover:bg-yellow-600 transition ${!isEditing ? '' : 'hidden'}`}
@@ -165,38 +219,15 @@ const App = () => {
         </div>
       </header>
 
-      {/* Main Editor Section */}
-      <main className="flex-grow flex">
-        <div className="w-full max-w-6xl mx-auto p-4 flex-grow flex">
-          <ReactQuill
-            ref={quillRef}
-            value={content}
-            onChange={setContent}
-            modules={modules}
-            formats={formats}
-            readOnly={!isEditing} // Disable editing when in view mode
-            placeholder="Start writing here..."
-            theme="snow"
-            className="flex-grow h-full" // Remove overflow-y-auto to avoid scrollbar
-          />
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="p-4 bg-gray-200 text-center text-sm">
-        &copy; 2024 Google Docs Clone. All Rights Reserved.
-      </footer>
-
-      {/* Saved Documents Section */}
-      {savedDocuments.length > 0 && (
-        <div className="p-4">
-          <h2 className="text-xl font-bold">Saved Documents</h2>
+      <main className="flex flex-grow">
+        <aside className="w-1/4 p-4 bg-gray-100 border-r">
+          <h2 className="text-xl font-bold">Documents</h2>
           <ul>
-            {savedDocuments.map((document, index) => (
+            {currentDocs.map((document, index) => (
               <li key={document.id} className="flex justify-between items-center p-2 border-b">
-                <span>Document {index + 1}</span>
+                <span>Document {index + 1 + indexOfFirstDoc}</span>
                 <button
-                  onClick={() => handleLoadDocument(index)}
+                  onClick={() => handleLoadDocument(index + indexOfFirstDoc)}
                   className="bg-blue-500 text-white px-2 py-1 rounded-md hover:bg-blue-600 transition"
                 >
                   Edit
@@ -204,8 +235,43 @@ const App = () => {
               </li>
             ))}
           </ul>
+          <div className="flex justify-between mt-4">
+            <button
+              onClick={handlePrevPage}
+              className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500 transition"
+              disabled={currentPage === 0}
+            >
+              Previous
+            </button>
+            <button
+              onClick={handleNextPage}
+              className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500 transition"
+              disabled={indexOfLastDoc >= savedDocuments.length}
+            >
+              Next
+            </button>
+          </div>
+        </aside>
+
+        <div className="flex-grow max-w-6xl mx-auto p-4">
+          <ReactQuill
+            ref={quillRef}
+            value={content}
+            onChange={setContent}
+            modules={modules}
+            formats={formats}
+            readOnly={!isEditing}
+            placeholder="Start writing here..."
+            theme="snow"
+            className="flex-grow h-full"
+            style={{ height: '100vh', width: '100%', maxWidth: '800px' }} // A4 dimensions
+          />
         </div>
-      )}
+      </main>
+
+      <footer className="p-4 bg-gray-200 text-center text-sm">
+        &copy; 2024 Google Docs Clone. All Rights Reserved.
+      </footer>
     </div>
   );
 };
