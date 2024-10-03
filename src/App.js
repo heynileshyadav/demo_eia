@@ -14,7 +14,7 @@ const App = () => {
   const quillRef = useRef(null); // Reference to the Quill editor
 
   // Function to download PDF
-  const handlePDFDownload = () => {
+ const handlePDFDownload = () => {
   const editorContent = quillRef.current.getEditor().root;
 
   // Create a temporary div for rendering the content
@@ -28,9 +28,18 @@ const App = () => {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
 
+  let pageNumber = 1; // Initialize page number
+
+  // Add index at the start of the PDF
+  pdf.setFontSize(12);
+  pdf.text('Index of Documents', pageWidth / 2, 20, { align: 'center' });
+  savedDocuments.forEach((doc, index) => {
+    pdf.text(`Document ${index + 1}:`, 10, 30 + index * 10);
+  });
+  pdf.addPage(); // Move to the next page for the editor content
+
   const renderPDFPage = (content, position, resolve) => {
     html2canvas(content, { scale: 2 }).then((canvas) => {
-      // const imgData = canvas.toDataURL('image/png');
       const imgWidth = pageWidth - 20; // Padding for the image inside the PDF
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -38,7 +47,7 @@ const App = () => {
       let offsetY = 0; // Vertical offset for slicing the canvas
 
       while (remainingHeight > 0) {
-        const fitHeight = Math.min(remainingHeight, pageHeight - position - 10); // Fit content to page height
+        const fitHeight = Math.min(remainingHeight, pageHeight - position - 20); // Fit content to page height (20 includes 5px top margin + 10px page number margin)
         const canvasSlice = document.createElement('canvas');
         canvasSlice.width = canvas.width;
         canvasSlice.height = (fitHeight / imgHeight) * canvas.height;
@@ -46,7 +55,10 @@ const App = () => {
         context.drawImage(canvas, 0, -offsetY, canvas.width, canvas.height);
 
         const imgSlice = canvasSlice.toDataURL('image/png');
-        pdf.addImage(imgSlice, 'PNG', 10, position, imgWidth, fitHeight);
+        pdf.addImage(imgSlice, 'PNG', 10, position + 5, imgWidth, fitHeight); // Adding 5px margin to the top of the content
+
+        // Add page number to the footer
+        pdf.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
         remainingHeight -= fitHeight;
         offsetY += fitHeight / imgHeight * canvas.height;
@@ -54,6 +66,7 @@ const App = () => {
         // If there's remaining height, add a new page
         if (remainingHeight > 0) {
           pdf.addPage();
+          pageNumber++; // Increment the page number
           position = 10; // Reset position for the new page
         }
       }
@@ -66,10 +79,6 @@ const App = () => {
     pdf.save('document.pdf');
   });
 };
-
-
-
-
   const handleSave = () => {
     const editorContent = quillRef.current.getEditor().root.innerHTML;
 
@@ -104,38 +113,6 @@ const App = () => {
     setIsEditing(true);
     setCurrentDocIndex(null);
   };
-
-  // const insertTable = () => {
-  //   const rows = parseInt(prompt('Enter the number of rows:'), 10);
-  //   const cols = parseInt(prompt('Enter the number of columns:'), 10);
-    
-  //   if (rows > 0 && cols > 0) {
-  //     const quill = quillRef.current.getEditor();
-  //     const selection = quill.getSelection();
-
-  //     const table = document.createElement('table');
-  //     table.style.width = '100%';
-  //     table.style.borderCollapse = 'collapse';
-  //     table.style.margin = '10px 0';
-      
-  //     for (let i = 0; i < rows; i++) {
-  //       const tr = document.createElement('tr');
-  //       for (let j = 0; j < cols; j++) {
-  //         const td = document.createElement('td');
-  //         td.style.border = '1px solid black';
-  //         td.style.padding = '8px';
-  //         td.innerText = `Row ${i + 1} Col ${j + 1}`;
-  //         tr.appendChild(td);
-  //       }
-  //       table.appendChild(tr);
-  //     }
-
-  //     if (selection) {
-  //       quill.clipboard.dangerouslyPasteHTML(selection.index, table.outerHTML);
-  //       quill.setSelection(selection.index + 1);
-  //     }
-  //   }
-  // };
 
   const modules = {
     toolbar: isEditing
